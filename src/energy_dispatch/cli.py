@@ -132,6 +132,10 @@ def run_pipeline(config: RunConfig | None = None) -> dict[str, Any]:
 
 
 def main(argv: list[str] | None = None) -> int:
+    import sys, io
+    if sys.stdout.encoding and sys.stdout.encoding.lower() not in ("utf-8", "utf8"):
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
     parser = argparse.ArgumentParser(description="Run the multi-timescale energy dispatch workflow.")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--pop-size", type=int, default=80)
