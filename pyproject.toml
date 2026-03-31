@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "multi-timescale-energy-dispatch"
+version = "0.1.0"
+description = "A compact Python implementation of multi-timescale energy dispatch with NSGA-II optimization."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+  { name = "Claude Code" }
+]
+dependencies = [
+  "numpy>=1.26",
+  "pymoo>=0.6.1"
+]
+
+[project.optional-dependencies]
+plot = ["matplotlib>=3.8"]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+energy-dispatch = "energy_dispatch.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
