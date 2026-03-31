@@ -51,8 +51,16 @@ def _print_summary(results: dict[str, Any]) -> None:
 def _plot_results(results: dict[str, Any]) -> None:
     try:
         import matplotlib.pyplot as plt
+        import matplotlib
     except ImportError as exc:
         raise RuntimeError("matplotlib is required for plotting. Install with `pip install .[plot]`.") from exc
+
+    # Pick a font that ships with Windows and covers CJK characters
+    for _font in ("Microsoft YaHei", "SimHei", "STHeiti", "WenQuanYi Micro Hei"):
+        if _font in [f.name for f in matplotlib.font_manager.fontManager.ttflist]:
+            matplotlib.rcParams["font.family"] = _font
+            break
+    matplotlib.rcParams["axes.unicode_minus"] = False
 
     final_obj = results["final_population_objectives"]
     pareto_obj = results["pareto_objectives"]
