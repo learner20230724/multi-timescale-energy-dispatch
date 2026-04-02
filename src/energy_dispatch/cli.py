@@ -140,11 +140,13 @@ def run_pipeline(config: RunConfig | None = None) -> dict[str, Any]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    import sys, io
-    if sys.stdout.encoding and sys.stdout.encoding.lower() not in ("utf-8", "utf8"):
-        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
-        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
+    import sys as _sys, io as _io
+    if _sys.stdout.encoding and _sys.stdout.encoding.lower() not in ("utf-8", "utf8"):
+        _sys.stdout = _io.TextIOWrapper(_sys.stdout.buffer, encoding="utf-8", errors="replace")
+        _sys.stderr = _io.TextIOWrapper(_sys.stderr.buffer, encoding="utf-8", errors="replace")
+
     parser = argparse.ArgumentParser(description="Run the multi-timescale energy dispatch workflow.")
+    parser.add_argument("--gui", action="store_true", help="Launch the GUI window.")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--pop-size", type=int, default=80)
     parser.add_argument("--max-gen", type=int, default=100)
@@ -155,6 +157,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--quiet", action="store_true")
     parser.add_argument("--output", type=Path, help="Optional JSON output path.")
     args = parser.parse_args(argv)
+
+    if args.gui:
+        from .gui import launch_gui
+        launch_gui()
+        return 0
 
     config = RunConfig(
         seed=args.seed,

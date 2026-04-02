@@ -14,15 +14,16 @@ authors = [
 ]
 dependencies = [
   "numpy>=1.26",
-  "pymoo>=0.6.1"
+  "pymoo>=0.6.1",
+  "matplotlib>=3.8"
 ]
 
 [project.optional-dependencies]
-plot = ["matplotlib>=3.8"]
 dev = ["pytest>=8.0"]
 
 [project.scripts]
 energy-dispatch = "energy_dispatch.cli:main"
+energy-gui = "energy_dispatch.gui:launch_gui"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
