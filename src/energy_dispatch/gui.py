@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import threading
 from datetime import datetime
-from tkinter import BOTH, END, EW, LEFT, NW, RAISED, RIGHT, S, Scrollbar, StringVar, Tk, W, Y
+from tkinter import BOTH, BOTTOM, END, EW, LEFT, NW, RAISED, RIGHT, S, Scrollbar, StringVar, Tk, W, Y
 from tkinter import ttk
 from tkinter.filedialog import asksaveasfilename
 from tkinter.messagebox import showinfo
