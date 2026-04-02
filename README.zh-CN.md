@@ -29,6 +29,7 @@ multi-timescale-energy-dispatch/
       optimization.py
       intraday.py
       cli.py
+      gui.py
   tests/
     test_smoke.py
     test_reference.py
@@ -53,12 +54,6 @@ pip install -e .
 python -m pip install pytest
 ```
 
-安装绘图依赖：
-
-```bash
-pip install -e .[plot]
-```
-
 ## 快速开始
 
 运行一个较小规模的冒烟流程：
@@ -73,10 +68,36 @@ energy-dispatch --pop-size 12 --max-gen 3
 energy-dispatch --output results.json
 ```
 
-启用可视化绘图：
+启用弹窗绘图：
 
 ```bash
 energy-dispatch --plots
+```
+
+## 图形界面
+
+启动桌面图形界面：
+
+```bash
+energy-gui
+```
+
+或
+
+```bash
+energy-dispatch --gui
+```
+
+图形界面提供：
+
+- **摘要标签页**：全部关键指标和 Pareto 解表格
+- **日志标签页**：实时运行输出
+- **Pareto 与调度标签页**：内嵌 Pareto 前沿和调度曲线图
+- **日内标签页**：内嵌储能和净不平衡对比图
+- **运行**：用自定义 Pop / Gen / Seed 参数开始优化
+- **保存结果**：将结果导出为 JSON
+- **保存图片**：将所有图表导出为 PDF 或 PNG
+- **清除**：重置界面
 ```
 
 ## 命令行用法

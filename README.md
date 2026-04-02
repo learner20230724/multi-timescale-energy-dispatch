@@ -29,6 +29,7 @@ multi-timescale-energy-dispatch/
       optimization.py
       intraday.py
       cli.py
+      gui.py
   tests/
     test_smoke.py
     test_reference.py
@@ -53,12 +54,6 @@ pip install -e .
 python -m pip install pytest
 ```
 
-Install plotting dependencies:
-
-```bash
-pip install -e .[plot]
-```
-
 ## Quick Start
 
 Run a small smoke workflow:
@@ -73,10 +68,36 @@ Run the default workflow and save results:
 energy-dispatch --output results.json
 ```
 
-Enable plots:
+Enable popup plots (separate windows):
 
 ```bash
 energy-dispatch --plots
+```
+
+## GUI
+
+Launch the graphical desktop interface:
+
+```bash
+energy-gui
+```
+
+or
+
+```bash
+energy-dispatch --gui
+```
+
+The GUI provides:
+
+- **Summary tab**: all key metrics and the Pareto solution table
+- **Log tab**: live run output
+- **Pareto & Dispatch tab**: embedded Pareto front and dispatch curves
+- **Intraday tab**: embedded storage and imbalance charts
+- **Run**: start optimization with custom Pop / Gen / Seed parameters
+- **Save Results**: export results as JSON
+- **Save Figures**: export all charts as PDF or PNG
+- **Clear**: reset the interface
 ```
 
 ## CLI Usage
