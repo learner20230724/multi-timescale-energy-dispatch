@@ -88,15 +88,15 @@ def decode_dispatch(individual: np.ndarray, model: SystemModel) -> DispatchSched
 
     P_charge = individual[idx : idx + model.T].copy()
     idx += model.T
-    P_discharge = individual[idx : idx + model.T].copy()
+    P_discharge = individual[idx : idx + model.T]
     idx += model.T
-    P_wind_curt = individual[idx : idx + model.T].copy()
+    P_wind_curt = individual[idx : idx + model.T]
     idx += model.T
-    P_solar_curt = individual[idx : idx + model.T].copy()
+    P_solar_curt = individual[idx : idx + model.T]
     idx += model.T
-    P_P2G = individual[idx : idx + model.T].copy()
+    P_P2G = individual[idx : idx + model.T]
     idx += model.T
-    P_P2A = individual[idx : idx + model.T].copy()
+    P_P2A = individual[idx : idx + model.T]
 
     for i in range(model.N_thermal):
         P_thermal[i, :] = np.clip(P_thermal[i, :], model.P_thermal_min[i], model.P_thermal_max[i])

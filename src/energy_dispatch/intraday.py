@@ -8,6 +8,10 @@ from .config import IntradayParams, SystemModel
 from .simulation import DispatchMetrics
 
 
+def _rms(arr: np.ndarray) -> float:
+    return float(np.sqrt(np.mean(arr**2)))
+
+
 def intraday_adjustment_step(
     P_wind_fc: float,
     P_solar_fc: float,
@@ -73,6 +77,17 @@ def intraday_adjustment_step(
     return P_ch, P_dis, SOC_next, delta_P_residual
 
 
+def _net(load, wind, solar, thermal, p_dis, p_ch, p_p2g, p_p2a):
+    return load - (wind + solar + thermal + p_dis - p_ch - p_p2g - p_p2a)
+
+
+def _switch_count(p_ch, p_dis, threshold=0.1):
+    state = np.zeros(96, dtype=int)
+    state[p_ch > threshold] = 1
+    state[p_dis > threshold] = 2
+    return int(np.sum(np.abs(np.diff(state)) > 0))
+
+
 def run_intraday(
     model: SystemModel,
     best_metrics: DispatchMetrics,
@@ -81,6 +96,7 @@ def run_intraday(
 ) -> dict[str, Any]:
     rng = np.random.default_rng(seed + 1)
 
+    # Forecast expansion: 24h -> 96 x 15min
     P_wind_da_15min = np.repeat(model.P_wind_forecast, 4)
     P_solar_da_15min = np.repeat(model.P_solar_forecast, 4)
     P_load_da_15min = np.repeat(model.P_load_forecast, 4)
@@ -102,16 +118,18 @@ def run_intraday(
     P_wind_inj_fc_15min = np.maximum(0.0, P_wind_fc_15min - P_wc_da_15min)
     P_solar_inj_fc_15min = np.maximum(0.0, P_solar_fc_15min - P_sc_da_15min)
 
+    # Day-ahead SOC trajectory (15-min resolution)
     SOC_da_15min = np.zeros(97, dtype=float)
     SOC_da_15min[0] = model.SOC_initial * model.E_storage_max
     for k in range(96):
         hour_idx = k // 4
-        SOC_da_15min[k + 1] = (
+        SOC_da_15min[k + 1] = np.clip(
             SOC_da_15min[k]
             + model.eta_charge * best_metrics.P_charge[hour_idx] * 0.25
-            - best_metrics.P_discharge[hour_idx] / model.eta_discharge * 0.25
+            - best_metrics.P_discharge[hour_idx] / model.eta_discharge * 0.25,
+            model.SOC_min_abs,
+            model.SOC_max_abs,
         )
-        SOC_da_15min[k + 1] = np.clip(SOC_da_15min[k + 1], model.SOC_min_abs, model.SOC_max_abs)
 
     params = IntradayParams(
         E_storage_max=model.E_storage_max,
@@ -121,11 +139,9 @@ def run_intraday(
         eta_discharge=model.eta_discharge,
         SOC_min=model.SOC_min,
         SOC_max=model.SOC_max,
-        dt=0.25,
-        soc_track_gain=0.05,
-        imbalance_deadband=5.0,
     )
 
+    # Rolling intraday simulation
     SOC = model.SOC_initial * model.E_storage_max
     P_ch_id = np.zeros(96, dtype=float)
     P_dis_id = np.zeros(96, dtype=float)
@@ -153,80 +169,27 @@ def run_intraday(
         residual_id[k] = residual
         SOC = SOC_next
 
-    P_net_da = P_load_da_15min - (
-        P_wind_inj_da_15min
-        + P_solar_inj_da_15min
-        + P_thermal_da_15min
-        + P_dis_da_15min
-        - P_ch_da_15min
-        - P_P2G_da_15min
-        - P_P2A_da_15min
-    )
-    P_net_id = P_load_fc_15min - (
-        P_wind_inj_fc_15min
-        + P_solar_inj_fc_15min
-        + P_thermal_da_15min
-        + P_dis_id
-        - P_ch_id
-        - P_P2G_da_15min
-        - P_P2A_da_15min
-    )
-
-    state = np.zeros(96, dtype=int)
-    state[P_ch_id > 0.1] = 1
-    state[P_dis_id > 0.1] = 2
-    switch_count = int(np.sum(np.abs(np.diff(state)) > 0))
-
-    rms_ch_dev = float(np.sqrt(np.mean((P_ch_id - P_ch_da_15min) ** 2)))
-    rms_dis_dev = float(np.sqrt(np.mean((P_dis_id - P_dis_da_15min) ** 2)))
-    rms_soc_dev = float(np.sqrt(np.mean((SOC_id - SOC_da_15min) ** 2)))
-    max_soc_dev = float(np.max(np.abs(SOC_id - SOC_da_15min)))
-    rms_net_actual = float(np.sqrt(np.mean(P_net_id**2)))
-    rms_net_if_da = float(
-        np.sqrt(
-            np.mean(
-                (
-                    P_load_fc_15min
-                    - (
-                        P_wind_inj_fc_15min
-                        + P_solar_inj_fc_15min
-                        + P_thermal_da_15min
-                        + P_dis_da_15min
-                        - P_ch_da_15min
-                        - P_P2G_da_15min
-                        - P_P2A_da_15min
-                    )
-                )
-                ** 2
-            )
-        )
-    )
+    # Net power imbalances
+    P_net_da = _net(P_load_da_15min, P_wind_inj_da_15min, P_solar_inj_da_15min,
+                     P_thermal_da_15min, P_dis_da_15min, P_ch_da_15min, P_P2G_da_15min, P_P2A_da_15min)
+    P_net_id = _net(P_load_fc_15min, P_wind_inj_fc_15min, P_solar_inj_fc_15min,
+                     P_thermal_da_15min, P_dis_id, P_ch_id, P_P2G_da_15min, P_P2A_da_15min)
+    # Net if we blindly followed day-ahead storage plan with intraday forecasts
+    P_net_if_da = _net(P_load_fc_15min, P_wind_inj_fc_15min, P_solar_inj_fc_15min,
+                        P_thermal_da_15min, P_dis_da_15min, P_ch_da_15min, P_P2G_da_15min, P_P2A_da_15min)
 
     intraday_fallback_used = False
-    if rms_net_actual > rms_net_if_da:
+    if _rms(P_net_id) > _rms(P_net_if_da):
         intraday_fallback_used = True
         P_ch_id = P_ch_da_15min.copy()
         P_dis_id = P_dis_da_15min.copy()
         SOC_id = SOC_da_15min.copy()
-        P_net_id = P_load_fc_15min - (
-            P_wind_inj_fc_15min
-            + P_solar_inj_fc_15min
-            + P_thermal_da_15min
-            + P_dis_id
-            - P_ch_id
-            - P_P2G_da_15min
-            - P_P2A_da_15min
-        )
+        P_net_id = _net(P_load_fc_15min, P_wind_inj_fc_15min, P_solar_inj_fc_15min,
+                         P_thermal_da_15min, P_dis_id, P_ch_id, P_P2G_da_15min, P_P2A_da_15min)
         residual_id = P_net_id.copy()
-        state = np.zeros(96, dtype=int)
-        state[P_ch_id > 0.1] = 1
-        state[P_dis_id > 0.1] = 2
-        switch_count = int(np.sum(np.abs(np.diff(state)) > 0))
-        rms_ch_dev = float(np.sqrt(np.mean((P_ch_id - P_ch_da_15min) ** 2)))
-        rms_dis_dev = float(np.sqrt(np.mean((P_dis_id - P_dis_da_15min) ** 2)))
-        rms_soc_dev = float(np.sqrt(np.mean((SOC_id - SOC_da_15min) ** 2)))
-        max_soc_dev = float(np.max(np.abs(SOC_id - SOC_da_15min)))
-        rms_net_actual = float(np.sqrt(np.mean(P_net_id**2)))
+
+    # Final metrics (computed once, after fallback decision)
+    switch_count = _switch_count(P_ch_id, P_dis_id)
 
     return {
         "P_ch_day_ahead": P_ch_da_15min,
@@ -244,12 +207,12 @@ def run_intraday(
         "P_solar_intraday_forecast": P_solar_fc_15min,
         "P_load_intraday_forecast": P_load_fc_15min,
         "residual": residual_id,
-        "charge_rms_dev": rms_ch_dev,
-        "discharge_rms_dev": rms_dis_dev,
-        "soc_rms_dev": rms_soc_dev,
-        "soc_max_dev": max_soc_dev,
-        "net_rms_intraday": rms_net_actual,
-        "net_rms_if_day_ahead": rms_net_if_da,
+        "charge_rms_dev": _rms(P_ch_id - P_ch_da_15min),
+        "discharge_rms_dev": _rms(P_dis_id - P_dis_da_15min),
+        "soc_rms_dev": _rms(SOC_id - SOC_da_15min),
+        "soc_max_dev": float(np.max(np.abs(SOC_id - SOC_da_15min))),
+        "net_rms_intraday": _rms(P_net_id),
+        "net_rms_if_day_ahead": _rms(P_net_if_da),
         "switch_count": switch_count,
         "fallback_used": intraday_fallback_used,
     }

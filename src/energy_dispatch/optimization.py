@@ -47,8 +47,8 @@ def build_decision_bounds(model: SystemModel) -> tuple[np.ndarray, np.ndarray]:
         [
             np.full(model.T, model.P_charge_max, dtype=float),
             np.full(model.T, model.P_discharge_max, dtype=float),
-            model.P_wind_forecast.astype(float).copy(),
-            model.P_solar_forecast.astype(float).copy(),
+            model.P_wind_forecast.astype(float),
+            model.P_solar_forecast.astype(float),
             np.full(model.T, model.P2G_max, dtype=float),
             np.full(model.T, model.P2A_max, dtype=float),
         ]
@@ -111,14 +111,14 @@ def select_compromise_solution(
         if candidate_idx.size == 1:
             best_index = int(candidate_idx[0])
         else:
-            candidate_obj = pareto_objectives[candidate_idx].copy()
-            for j in range(candidate_obj.shape[1]):
-                min_val = float(np.min(candidate_obj[:, j]))
-                max_val = float(np.max(candidate_obj[:, j]))
-                if abs(max_val - min_val) > np.finfo(float).eps:
-                    candidate_obj[:, j] = (candidate_obj[:, j] - min_val) / (max_val - min_val)
-                else:
-                    candidate_obj[:, j] = 0.5
+            obj_min = pareto_objectives[candidate_idx].min(axis=0)
+            obj_max = pareto_objectives[candidate_idx].max(axis=0)
+            obj_range = obj_max - obj_min
+            candidate_obj = np.where(
+                obj_range > np.finfo(float).eps,
+                (pareto_objectives[candidate_idx] - obj_min) / obj_range,
+                0.5,
+            )
 
             weights = np.array([0.40, 0.35, 0.25], dtype=float)
             weighted_norm = candidate_obj * weights
