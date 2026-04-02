@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import threading
 from datetime import datetime
-from tkinter import BOTH, END, EW, LEFT, NW, RAISED, RIGHT, S, Scrollbar, Tk, W, Y
+from tkinter import BOTH, END, EW, LEFT, NW, RAISED, RIGHT, S, Scrollbar, StringVar, Tk, W, Y
 from tkinter import ttk
 from tkinter.filedialog import asksaveasfilename
 from tkinter.messagebox import showinfo
@@ -75,9 +75,9 @@ class ResultsViewer:
             Label(parent, text=label_text).pack(side=LEFT, padx=(0, padx))
             ttk.Entry(parent, textvariable=var, width=width).pack(side=LEFT, padx=(0, 10))
 
-        self.pop_var = ttk.StringVar(value="80")
-        self.gen_var = ttk.StringVar(value="100")
-        self.seed_var = ttk.StringVar(value="42")
+        self.pop_var = StringVar(value="80")
+        self.gen_var = StringVar(value="100")
+        self.seed_var = StringVar(value="42")
 
         row("种群规模 (Pop):", self.pop_var)
         row("迭代次数 (Gen):", self.gen_var)
