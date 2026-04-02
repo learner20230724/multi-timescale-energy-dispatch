@@ -4,7 +4,7 @@ import argparse
 import json
 from dataclasses import fields, is_dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import numpy as np
 
@@ -114,10 +114,13 @@ def _plot_results(results: dict[str, Any]) -> None:
     plt.show()
 
 
-def run_pipeline(config: RunConfig | None = None) -> dict[str, Any]:
+def run_pipeline(
+    config: RunConfig | None = None,
+    log_callback: Callable[[int, float, float, float, int], None] | None = None,
+) -> dict[str, Any]:
     config = config or RunConfig()
     model = build_default_model(config.seed)
-    day_ahead = run_day_ahead(model, config)
+    day_ahead = run_day_ahead(model, config, log_callback=log_callback)
     intraday = run_intraday(model, day_ahead["best_metrics"], sigma=config.intraday_error_sigma, seed=config.seed)
 
     results = {

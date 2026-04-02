@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Callable
 
 import numpy as np
 from pymoo.algorithms.moo.nsga2 import NSGA2
+from pymoo.core.callback import Callback
 from pymoo.core.problem import Problem
 from pymoo.optimize import minimize
 from pymoo.operators.crossover.sbx import SBX
@@ -12,6 +13,30 @@ from pymoo.operators.sampling.rnd import FloatRandomSampling
 
 from .config import RunConfig, SystemModel
 from .simulation import DispatchMetrics, objective_values, simulate_dispatch
+
+
+class _NoOpCallback(Callback):
+    def notify(self, algorithm, **kwargs):
+        pass
+
+
+class _GenProgressCallback(Callback):
+    def __init__(self, log_callback: Callable[[int, float, float, float, int], None], interval: int = 10):
+        super().__init__()
+        self.log_callback = log_callback
+        self.interval = interval
+
+    def notify(self, algorithm, **kwargs):
+        gen = algorithm.n_gen
+        if gen % self.interval == 0 or gen == 1:
+            pareto = algorithm.opt
+            if len(pareto) > 0:
+                all_F = np.array([ind.F for ind in pareto])
+                pareto_size = len(pareto)
+                best_cost = float(all_F[:, 0].min())
+                best_carbon = float(all_F[:, 1].min())
+                best_curt = float(all_F[:, 2].min())
+                self.log_callback(gen, best_cost, best_carbon, best_curt, pareto_size)
 
 
 class DispatchProblem(Problem):
@@ -137,7 +162,11 @@ def select_compromise_solution(
     return best_index, metrics_list[best_index], selection_details
 
 
-def run_day_ahead(model: SystemModel, config: RunConfig) -> dict[str, Any]:
+def run_day_ahead(
+    model: SystemModel,
+    config: RunConfig,
+    log_callback: Callable[[int, float, float, float, int], None] | None = None,
+) -> dict[str, Any]:
     problem = DispatchProblem(model)
     algorithm = NSGA2(
         pop_size=config.pop_size,
@@ -146,6 +175,7 @@ def run_day_ahead(model: SystemModel, config: RunConfig) -> dict[str, Any]:
         mutation=PM(prob=config.mutation_prob, eta=20),
         eliminate_duplicates=True,
     )
+    callback = _GenProgressCallback(log_callback) if log_callback else _NoOpCallback()
     result = minimize(
         problem,
         algorithm,
@@ -153,6 +183,7 @@ def run_day_ahead(model: SystemModel, config: RunConfig) -> dict[str, Any]:
         seed=config.seed,
         save_history=True,
         verbose=config.verbose,
+        callback=callback,
     )
 
     final_population = _ensure_2d(result.pop.get("X"), model.n_vars)
